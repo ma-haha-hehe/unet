@@ -33,6 +33,7 @@ LOSS_NAMES.append('BCEWithLogitsLoss')
 --arch NestedUNet
 
 """
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #参数定义
 #parse_args()函数：解析命令行参数
@@ -94,7 +95,7 @@ def parse_args():
     parser.add_argument('--nesterov', default=False, type=str2bool,
                         help='nesterov')
 
-    # scheduler
+    # scheduler 学习率调度器
     parser.add_argument('--scheduler', default='CosineAnnealingLR',
                         choices=['CosineAnnealingLR', 'ReduceLROnPlateau', 'MultiStepLR', 'ConstantLR'])
     parser.add_argument('--min_lr', default=1e-5, type=float,
@@ -126,20 +127,20 @@ def train(config, train_loader, model, criterion, optimizer):
     #total=len(train_loader)总共有多少batch
     pbar = tqdm(total=len(train_loader))
 
-    #input模型输入 target标签
+    #input模型输入 target标签 读取训练数据
     for input, target, _ in train_loader:
-        input = input.cuda()
-        target = target.cuda()
+        input = input.to(device)
+        target = target.to(device)
 
         # compute output
         #前向传播
-        if config['deep_supervision']:
+        if config['deep_supervision']: #深度监督
             outputs = model(input)
             loss = 0
             for output in outputs:
                 loss += criterion(output, target)
-            loss /= len(outputs)
-            iou = iou_score(outputs[-1], target)
+            loss /= len(outputs) #取平均的输出损失
+            iou = iou_score(outputs[-1], target) #计算outputs最后一个输出与target之间的IOU交并比
         else:
             output = model(input)
             loss = criterion(output, target)
@@ -147,9 +148,9 @@ def train(config, train_loader, model, criterion, optimizer):
 
         # compute gradient and do optimizing step
         #反向传播 参数更新
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        optimizer.zero_grad()  #梯度清零
+        loss.backward()   #反向传播
+        optimizer.step() #优化器更新
 
         #更新AverageMeter
         avg_meters['loss'].update(loss.item(), input.size(0))
@@ -246,7 +247,7 @@ def main():
                                            config['input_channels'],
                                            config['deep_supervision'])
 
-    model = model.cuda() #将模型给cuda
+    model = model.to(device) #将模型给cuda
 
     #选择优化器optimizer
     #params过滤掉requires_grad=Flase的参数 确保只有可训练的参数被优化
@@ -284,7 +285,7 @@ def main():
     train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
     #数据增强：
     train_transform = Compose([
-        transforms.RandomRotate90(),
+        transforms.Affine(rotate=(-90, 90), p=0.5),
         transforms.Flip(),
         OneOf([
             transforms.HueSaturationValue(),

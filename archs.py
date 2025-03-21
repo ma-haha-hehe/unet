@@ -139,6 +139,7 @@ class NestedUNet(nn.Module):
         x0_4 = self.conv0_4(torch.cat([x0_0, x0_1, x0_2, x0_3, self.up(x1_3)], 1))
         print('x0_4:',x0_4.shape)
 
+        #监督学习 可以输出每一步的效果
         if self.deep_supervision:
             output1 = self.final1(x0_1)
             output2 = self.final2(x0_2)
