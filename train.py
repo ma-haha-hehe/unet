@@ -283,6 +283,7 @@ def main():
 
     #80%训练 20%验证
     train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
+    
     #数据增强：
     train_transform = Compose([
         transforms.Affine(rotate=(-90, 90), p=0.5),
